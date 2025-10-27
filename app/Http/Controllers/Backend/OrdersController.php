@@ -54,4 +54,12 @@ class OrdersController extends Controller
         $orders ->delete();
         return redirect()->route('orders.index')->with('success', 'Danh mục đã được xóa!');
     }
+
+    public function show($id)
+    {
+        // load order + items + product (requires relations in model)
+        $order = Orders::with(['items.product'])->findOrFail($id);
+        $template = 'backend.orders.show';
+        return view('backend.layout', compact('template', 'order'));
+    }
 }

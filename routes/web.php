@@ -75,7 +75,7 @@ Route::get('orders/index', [OrdersController::class, 'index'])->name('orders.ind
 Route::get('oders/edit/{id}', [OrdersController::class, 'edit'])->name('orders.edit')->middleware(AuthenticateMiddleware::class);
 Route::post('orders/update/{id}', [OrdersController::class, 'update'])->name('orders.update')->middleware(AuthenticateMiddleware::class);
 Route::delete('oders/delete/{id}', [OrdersController::class, 'delete'])->name('orders.delete')->middleware(AuthenticateMiddleware::class);
-
+Route::get('/admin/orders/{id}', [OrdersController::class, 'show'])->name('orders.show');
 /* Thống kế */
 Route::get('revenue/index',[RevenueController::class, 'index'])->name('revenue.index')->middleware(AuthenticateMiddleware::class);
 
@@ -95,7 +95,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
 });
 
 /* Xem thông tin */
-Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index')->middleware(AuthenticateMiddleware::class);
+Route::get('/profile', [ProfileController::class, 'index'])->name('profile')->middleware(AuthenticateMiddleware::class);
 
 /* Chỉnh sửa thông tin */
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware(AuthenticateMiddleware::class);
