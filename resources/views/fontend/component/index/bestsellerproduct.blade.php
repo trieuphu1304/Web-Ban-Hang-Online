@@ -13,7 +13,12 @@
                             <img class="img-fluid" src="{{ asset('upload/products/' . $products->image) }}"
                                 alt="{{ $products->name }}">
                             <ul class="card-product__imgOverlay">
-                                <li><button><i class="ti-search"></i></button></li>
+                                <li>
+                                    <button
+                                        onclick="window.location.href='{{ route('productdetail.index', $products->id) }}'">
+                                        <i class="ti-search"></i>
+                                    </button>
+                                </li>
                                 <li><button class="add-to-cart_1" data-product-id="{{ $products->id }}"><i
                                             class="ti-shopping-cart"></i></button></li>
                                 <li><button><i class="ti-heart"></i></button></li>
@@ -34,48 +39,189 @@
 </section>
 
 <script>
-    // Lắng nghe sự kiện khi nhấn vào nút "Add to Cart"
-    document.querySelectorAll('.add-to-cart_1').forEach(function(button) {
-        button.addEventListener('click', function() {
-            var productId = this.getAttribute('data-product-id');
-            var quantity = 1; // Mặc định là 1 sản phẩm khi nhấn thêm vào giỏ hàng
+    document.addEventListener('DOMContentLoaded', async function() {
+        const csrfToken = '{{ csrf_token() }}';
+        const isAuthenticated = {{ auth()->check() ? 'true' : 'false' }};
+        const loginUrl = '{{ route('login.index') }}';
 
-            // Gửi yêu cầu AJAX để thêm sản phẩm vào giỏ hàng
-            fetch('{{ route('cart.add') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        'products_id': productId,
-                        'quantity': quantity
+        // Add to cart handler
+        document.querySelectorAll('.add-to-cart_1').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const productId = this.getAttribute('data-product-id');
+                const quantity = 1;
+
+                fetch('{{ route('cart.add') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            'products_id': productId,
+                            'quantity': quantity
+                        })
                     })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Thông báo thành công với SweetAlert2
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Đã thêm sản phẩm vào giỏ!',
-                        timer: 2000, // 2 giây tự động đóng thông báo
-                        showConfirmButton: false // Không hiển thị nút "OK"
+                    .then(response => response.json())
+                    .then(data => {
+                        document.querySelector('.nav-shop__circle').textContent = data
+                            .cartCount;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Đã thêm vào giỏ hàng!',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Lỗi!',
+                            text: 'Không thể thêm vào giỏ hàng.'
+                        });
                     });
+            });
+        });
 
-                    // Cập nhật số lượng giỏ hàng
-                    document.querySelector('.nav-shop__circle').textContent = data
-                    .cartCount; // Cập nhật số lượng giỏ hàng
-                })
-                .catch(error => {
-                    console.error('Error:', error);
+        // Prompt login if not authenticated
+        async function requireAuthOrPrompt() {
+            if (isAuthenticated) return true;
+            const result = await Swal.fire({
+                title: 'Bạn cần đăng nhập',
+                text: 'Vui lòng đăng nhập để sử dụng chức năng yêu thích.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Đăng nhập',
+                cancelButtonText: 'Hủy'
+            });
+            if (result.isConfirmed) window.location.href = loginUrl;
+            return false;
+        }
 
-                    // Thông báo lỗi với SweetAlert2
+        // Find product id from container
+        function findProductId(btn) {
+            const container = btn.closest('.card-product__img') || btn.closest('.card-product');
+            if (!container) return null;
+            const any = container.querySelector('[data-product-id]');
+            return any ? parseInt(any.getAttribute('data-product-id')) : null;
+        }
+
+        // Set heart button visual state
+        function setHeartVisual(btn, active) {
+            const icon = btn.querySelector('i.ti-heart');
+            if (!icon) return;
+            if (active) {
+                btn.classList.add('favorited');
+                icon.style.color = '#e0245e';
+            } else {
+                btn.classList.remove('favorited');
+                icon.style.color = '';
+            }
+        }
+
+        // Get all heart buttons
+        const heartButtons = Array.from(document.querySelectorAll('.card-product__imgOverlay button'))
+            .filter(btn => btn.querySelector('i.ti-heart'));
+
+        // Load initial favorites state
+        let favorites = [];
+        if (isAuthenticated) {
+            try {
+                const res = await fetch('{{ route('favorite.list') }}', {
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    favorites = json.favorites || [];
+                }
+            } catch (e) {
+                console.error('Load favorites error:', e);
+            }
+        } else {
+            favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        }
+
+        // Apply initial states
+        heartButtons.forEach(btn => {
+            const pid = findProductId(btn);
+            if (pid && favorites.includes(pid)) setHeartVisual(btn, true);
+        });
+
+        // Handle heart button clicks
+        heartButtons.forEach(btn => {
+            btn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                if (!await requireAuthOrPrompt()) return;
+
+                const pid = findProductId(this);
+                if (!pid) {
+                    console.debug('favorite: product id not found for button', this);
+                    return;
+                }
+
+                try {
+                    const res = await fetch('{{ route('favorite.toggle') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({
+                            product_id: pid
+                        })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const added = data.action === 'added';
+                        setHeartVisual(this, added);
+                        Swal.fire({
+                            icon: 'success',
+                            title: added ? 'Đã thêm vào yêu thích' :
+                                'Đã xóa khỏi yêu thích',
+                            timer: 1200,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        throw new Error(data.message || 'Lỗi server');
+                    }
+                } catch (err) {
+                    console.error('Favorite toggle error:', err);
                     Swal.fire({
                         icon: 'error',
-                        title: 'Có lỗi xảy ra!',
-                        text: 'Vui lòng thử lại sau.'
+                        title: 'Lỗi',
+                        text: 'Không thể thay đổi trạng thái yêu thích'
                     });
-                });
+                }
+            });
         });
     });
 </script>
+
+<style>
+    .card-product__imgOverlay .favorited {
+        background: rgba(224, 36, 94, 0.08);
+    }
+
+    .card-product__imgOverlay button {
+        border: none;
+        background: rgba(0, 0, 0, 0.04);
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+    }
+
+    .card-product__imgOverlay button i.ti-heart {
+        font-size: 16px;
+        transition: color .15s ease;
+    }
+</style>

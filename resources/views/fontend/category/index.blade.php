@@ -130,48 +130,190 @@
         easing: 'ease-in-out',
         duration: 800
     });
-</script>
 
-<script>
-    // Lắng nghe sự kiện khi nhấn vào nút "Add to Cart"
-    document.querySelectorAll('.add-to-cart').forEach(function(button) {
-        button.addEventListener('click', function() {
-            var productId = this.getAttribute('data-product-id');
-            var quantity = 1; // Mặc định là 1 sản phẩm khi nhấn thêm vào giỏ hàng
+    document.addEventListener('DOMContentLoaded', async function() {
+        const csrfToken = '{{ csrf_token() }}';
+        const isAuthenticated = {{ auth()->check() ? 'true' : 'false' }};
+        const loginUrl = '{{ route('login.index') }}';
 
-            // Gửi yêu cầu AJAX để thêm sản phẩm vào giỏ hàng
-            fetch('{{ route('cart.add') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        'products_id': productId,
-                        'quantity': quantity
+        // Add to cart
+        document.querySelectorAll('.add-to-cart').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const productId = this.getAttribute('data-product-id');
+                const quantity = 1;
+                fetch('{{ route('cart.add') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({
+                            products_id: productId,
+                            quantity
+                        })
                     })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Cập nhật giỏ hàng
-                    document.querySelector('.nav-shop__circle').textContent = data.cartCount;
-
-                    // Hiển thị thông báo bằng SweetAlert2
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Đã thêm vào giỏ hàng',
-                        showConfirmButton: false,
-                        timer: 1500
+                    .then(r => r.json())
+                    .then(data => {
+                        document.querySelector('.nav-shop__circle').textContent = data
+                            .cartCount;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Đã thêm vào giỏ hàng',
+                            showConfirmButton: false,
+                            timer: 1500
+                        });
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Lỗi!',
+                            text: 'Không thể thêm sản phẩm vào giỏ hàng.'
+                        });
                     });
-                })
-                .catch(error => {
+            });
+        });
+
+        // Prompt login if unauthenticated
+        async function requireAuthOrPrompt() {
+            if (isAuthenticated) return true;
+            const res = await Swal.fire({
+                title: 'Bạn cần đăng nhập',
+                text: 'Vui lòng đăng nhập để sử dụng chức năng yêu thích.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Đăng nhập',
+                cancelButtonText: 'Hủy'
+            });
+            if (res.isConfirmed) window.location.href = loginUrl;
+            return false;
+        }
+
+        // Favorite buttons
+        const heartButtons = Array.from(document.querySelectorAll('.card-product__imgOverlay button'))
+            .filter(btn => btn.querySelector('i.ti-heart'));
+
+        function findProductId(btn) {
+            const container = btn.closest('.card-product__img') || btn.closest('.card-product') || btn
+                .closest('.col-md-6') || btn.closest('.col-lg-4');
+            if (!container) return null;
+            const any = container.querySelector('[data-product-id]');
+            if (any) return parseInt(any.getAttribute('data-product-id'));
+            const cartBtn = container.querySelector(
+                '.add-to-cart[data-product-id], .add-to-cart_1[data-product-id]');
+            if (cartBtn) return parseInt(cartBtn.getAttribute('data-product-id'));
+            return null;
+        }
+
+        function setHeartVisual(btn, active) {
+            const icon = btn.querySelector('i.ti-heart');
+            if (!icon) return;
+            if (active) {
+                btn.classList.add('favorited');
+                icon.style.color = '#e0245e';
+            } else {
+                btn.classList.remove('favorited');
+                icon.style.color = '';
+            }
+        }
+
+        // Load favorites: user from API, guest from localStorage
+        let favorites = [];
+        if (isAuthenticated) {
+            try {
+                const res = await fetch('{{ route('favorite.list') }}', {
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    favorites = json.favorites || [];
+                }
+            } catch (e) {
+                console.error('Load favorites error', e);
+            }
+        } else {
+            favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        }
+
+        // initial visuals
+        heartButtons.forEach(btn => {
+            const pid = findProductId(btn);
+            if (pid && favorites.includes(pid)) setHeartVisual(btn, true);
+        });
+
+        // click handlers (check auth first)
+        heartButtons.forEach(btn => {
+            btn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                if (!await requireAuthOrPrompt()) return;
+
+                const pid = findProductId(this);
+                if (!pid) {
+                    console.debug('favorite: product id not found for button', this);
+                    return;
+                }
+
+                try {
+                    const res = await fetch('{{ route('favorite.toggle') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({
+                            product_id: pid
+                        })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const added = data.action === 'added';
+                        setHeartVisual(this, added);
+                        Swal.fire({
+                            icon: 'success',
+                            title: added ? 'Đã thêm vào yêu thích' :
+                                'Đã xóa khỏi yêu thích',
+                            timer: 1200,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        throw new Error(data.message || 'Lỗi server');
+                    }
+                } catch (err) {
+                    console.error(err);
                     Swal.fire({
                         icon: 'error',
-                        title: 'Lỗi!',
-                        text: 'Không thể thêm sản phẩm vào giỏ hàng.',
+                        title: 'Lỗi',
+                        text: 'Không thể thay đổi yêu thích'
                     });
-                    console.error('Error:', error);
-                });
+                }
+            });
         });
     });
 </script>
+
+<style>
+    .card-product__imgOverlay .favorited {
+        background: rgba(224, 36, 94, 0.08);
+    }
+
+    .card-product__imgOverlay button {
+        border: none;
+        background: rgba(0, 0, 0, 0.04);
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+    }
+
+    .card-product__imgOverlay button i.ti-heart {
+        font-size: 16px;
+        transition: color .15s ease;
+    }
+</style>

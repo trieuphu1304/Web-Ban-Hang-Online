@@ -72,6 +72,9 @@
                                     <li class="nav-item">
                                         <a class="nav-link" href="{{ route('authfontend.logout') }}">Đăng xuất</a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{{ route('favorite.index') }}">Yêu thích</a>
+                                    </li>
                                 @endauth
                             </ul>
                             <style>

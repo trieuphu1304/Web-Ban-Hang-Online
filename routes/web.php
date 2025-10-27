@@ -23,6 +23,7 @@ use App\Http\Controllers\Fontend\CheckoutController;
 use App\Http\Controllers\Fontend\ProductDetailController;
 use App\Http\Controllers\Fontend\RegisterController;
 use App\Http\Controllers\Fontend\SubscribeController;
+use App\Http\Controllers\Fontend\FavoriteController;
 use App\Http\Middleware\AuthenticateMiddleware;
 
 
@@ -142,3 +143,7 @@ Route::get('/chat/load', [ChatController::class, 'load']);
 Route::post('/chat/send', [ChatController::class, 'send']);
 /* Đăng kí thành viên */
 Route::post('/subscribe', [SubscribeController::class, 'store'])->name('subscribe.store');
+/* Yêu thích sản phẩm */
+Route::get('/favorite', [FavoriteController::class, 'index'])->name('favorite.index');
+Route::get('/favorite/list', [FavoriteController::class, 'list'])->name('favorite.list');
+Route::post('/favorite/toggle', [FavoriteController::class, 'toggle'])->name('favorite.toggle');
