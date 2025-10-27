@@ -75,6 +75,11 @@
                                     <li class="nav-item">
                                         <a class="nav-link" href="{{ route('favorite.index') }}">Yêu thích</a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{{ route('profile.index') }}">
+                                            Tài khoản
+                                        </a>
+                                    </li>
                                 @endauth
                             </ul>
                             <style>

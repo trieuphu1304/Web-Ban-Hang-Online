@@ -24,6 +24,7 @@ use App\Http\Controllers\Fontend\ProductDetailController;
 use App\Http\Controllers\Fontend\RegisterController;
 use App\Http\Controllers\Fontend\SubscribeController;
 use App\Http\Controllers\Fontend\FavoriteController;
+use App\Http\Controllers\Fontend\ProfileController as FontendProfileController;
 use App\Http\Middleware\AuthenticateMiddleware;
 
 
@@ -147,3 +148,7 @@ Route::post('/subscribe', [SubscribeController::class, 'store'])->name('subscrib
 Route::get('/favorite', [FavoriteController::class, 'index'])->name('favorite.index');
 Route::get('/favorite/list', [FavoriteController::class, 'list'])->name('favorite.list');
 Route::post('/favorite/toggle', [FavoriteController::class, 'toggle'])->name('favorite.toggle');
+/* Thông tin tài khoản */
+Route::get('/profile/user', [FontendProfileController::class, 'index'])->name('profile.index');
+Route::put('/profile/user/update', [FontendProfileController::class, 'updateProfile'])->name('profile.update');
+Route::put('/profile/user/password', [FontendProfileController::class, 'updatePassword'])->name('profile.password');

@@ -38,49 +38,14 @@
         const csrfToken = '{{ csrf_token() }}';
         const isAuthenticated = {{ auth()->check() ? 'true' : 'false' }};
         const loginUrl = '{{ route('login.index') }}';
+        const favListRoute = '{{ route('favorite.list') }}';
+        const favToggleRoute = '{{ route('favorite.toggle') }}';
 
-        // Add to cart buttons
-        document.querySelectorAll('.add-to-cart').forEach(function(button) {
-            button.addEventListener('click', function() {
-                var productId = this.getAttribute('data-product-id');
-                var quantity = 1;
-                fetch('{{ route('cart.add') }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            'products_id': productId,
-                            'quantity': quantity
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Đã thêm sản phẩm vào giỏ!',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                        const badge = document.querySelector('.nav-shop__circle');
-                        if (badge) badge.textContent = data.cartCount ?? badge
-                            .textContent;
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Có lỗi xảy ra!',
-                            text: 'Vui lòng thử lại sau.'
-                        });
-                    });
-            });
-        });
+        // Guard: nếu script đã được gắn trước đó thì không gắn lại
+        if (window.__favDelegated) return;
+        window.__favDelegated = true;
 
-        // Helper: prompt login if unauthenticated
+        // helper prompt login
         async function requireAuthOrPrompt() {
             if (isAuthenticated) return true;
             const res = await Swal.fire({
@@ -95,37 +60,25 @@
             return false;
         }
 
-        // Favorite buttons (only the buttons that contain a ti-heart icon)
-        const heartButtons = Array.from(document.querySelectorAll('.card-product__imgOverlay button'))
-            .filter(btn => btn.querySelector('i.ti-heart'));
-
-        // find product id inside the same product block
         function findProductId(btn) {
             const container = btn.closest('.card-product__img') || btn.closest('.card-product');
             if (!container) return null;
             const any = container.querySelector('[data-product-id]');
-            if (any) return parseInt(any.getAttribute('data-product-id'));
-            // fallback: check parent attributes
-            return null;
+            return any ? parseInt(any.getAttribute('data-product-id')) : null;
         }
 
         function setHeartVisual(btn, active) {
             const icon = btn.querySelector('i.ti-heart');
             if (!icon) return;
-            if (active) {
-                btn.classList.add('favorited');
-                icon.style.color = '#e0245e';
-            } else {
-                btn.classList.remove('favorited');
-                icon.style.color = '';
-            }
+            btn.classList.toggle('favorited', !!active);
+            icon.style.color = active ? '#e0245e' : '';
         }
 
-        // Load initial favorites (user from API, guest from localStorage)
+        // Load favorites (only once)
         let favorites = [];
-        if (isAuthenticated) {
-            try {
-                const res = await fetch('{{ route('favorite.list') }}', {
+        try {
+            if (isAuthenticated) {
+                const res = await fetch(favListRoute, {
                     credentials: 'same-origin',
                     headers: {
                         'Accept': 'application/json'
@@ -135,70 +88,86 @@
                     const json = await res.json();
                     favorites = json.favorites || [];
                 }
-            } catch (e) {
-                console.error('Load favorites error', e);
+            } else {
+                favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
             }
-        } else {
-            favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        } catch (e) {
+            console.error('Load favorites error', e);
         }
 
-        // Apply initial visuals
-        heartButtons.forEach(btn => {
+        // Apply initial visuals (safe to run multiple times)
+        document.querySelectorAll('.card-product__imgOverlay button').forEach(btn => {
+            if (!btn.querySelector('i.ti-heart')) return;
             const pid = findProductId(btn);
             if (pid && favorites.includes(pid)) setHeartVisual(btn, true);
         });
 
-        // Click handlers (require login first)
-        heartButtons.forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.preventDefault();
+        // Delegated click handler on nearest container (row)
+        const rowContainer = document.querySelector('.row') || document;
+        rowContainer.addEventListener('click', async function(e) {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            if (!btn.querySelector('i.ti-heart')) return; // not a heart button
 
-                // require login
-                if (!await requireAuthOrPrompt()) return;
+            e.preventDefault();
 
-                const pid = findProductId(this);
-                if (!pid) {
-                    console.debug('favorite: product id not found for button', this);
+            // Prevent double processing on same button
+            if (btn.dataset.favProcessing === '1') return;
+            btn.dataset.favProcessing = '1';
+
+            try {
+                if (!await requireAuthOrPrompt()) {
+                    btn.dataset.favProcessing = '0';
                     return;
                 }
 
-                // Toggle favorite on server (authenticated user)
-                try {
-                    const res = await fetch('{{ route('favorite.toggle') }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
-                        },
-                        body: JSON.stringify({
-                            product_id: pid
-                        })
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        const added = data.action === 'added';
-                        setHeartVisual(this, added);
-                        Swal.fire({
-                            icon: 'success',
-                            title: added ? 'Đã thêm vào yêu thích' :
-                                'Đã xóa khỏi yêu thích',
-                            timer: 1200,
-                            showConfirmButton: false
-                        });
-                    } else {
-                        throw new Error(data.message || 'Lỗi');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Lỗi',
-                        text: 'Không thể thay đổi yêu thích'
-                    });
+                const pid = findProductId(btn);
+                if (!pid) {
+                    console.debug('favorite: product id not found for button', btn);
+                    btn.dataset.favProcessing = '0';
+                    return;
                 }
-            });
+
+                const res = await fetch(favToggleRoute, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        product_id: pid
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const added = data.action === 'added';
+                    setHeartVisual(btn, added);
+                    Swal.fire({
+                        icon: 'success',
+                        title: added ? 'Đã thêm vào yêu thích' :
+                            'Đã xóa khỏi yêu thích',
+                        timer: 1200,
+                        showConfirmButton: false
+                    });
+                } else {
+                    throw new Error(data.message || 'Lỗi server');
+                }
+            } catch (err) {
+                console.error('Favorite toggle error', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi',
+                    text: 'Không thể thay đổi trạng thái yêu thích'
+                });
+            } finally {
+                // unlock button
+                btn.dataset.favProcessing = '0';
+            }
+        }, {
+            passive: false
         });
     });
 </script>
