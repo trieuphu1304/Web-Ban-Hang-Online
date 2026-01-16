@@ -77,7 +77,7 @@
                                                     <a
                                                         href="{{ route('productdetail.index', $product->id) }}">{{ $product->name }}</a>
                                                 </h4>
-                                                <p class="card-product__price">{{ $product->price }}</p>
+                                                <p class="card-product__price">${{ $product->price }}</p>
                                         </div>
                                     </div>
                                 </div>

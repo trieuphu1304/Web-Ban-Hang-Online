@@ -45,7 +45,7 @@
                                                 <small style="color:#666;">x {{ $item['quantity'] }}</small>
                                             </div>
                                             <span class="last" style="margin-left:auto; font-weight:600;">
-                                                {{ number_format($item['price'], 0, ',', '.') }} VND
+                                                {{ number_format($item['price'], 0, ',', '.') }} $
                                             </span>
                                         </a>
                                     </li>
@@ -54,10 +54,10 @@
 
                             <ul class="list list_2">
                                 <li><a href="#">Tổng mặt hàng <span>{{ number_format($total, 0, ',', '.') }}
-                                            VND</span></a></li>
-                                <li><a href="#">Phí giao hàng <span>50 VND</span></a></li>
+                                            $</span></a></li>
+                                <li><a href="#">Phí giao hàng <span>50 $</span></a></li>
                                 <li><a href="#">Tổng <span>{{ number_format($total + 50, 0, ',', '.') }}
-                                            VND</span></a></li>
+                                            $</span></a></li>
                             </ul>
 
                             <!-- chọn phương thức -->

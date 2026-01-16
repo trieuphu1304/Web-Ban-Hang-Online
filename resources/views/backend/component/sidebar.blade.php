@@ -45,7 +45,7 @@
                     </g>
                 </svg>
             </span>
-            <span class="app-brand-text demo menu-text fw-bolder ms-2" style="text-transform: none; ">Quản lí</span>
+            <span class="app-brand-text demo menu-text fw-bolder ms-2" style="text-transform: none; ">Quản Lí</span>
         </a>
 
         <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto d-block d-xl-none">
@@ -57,6 +57,12 @@
 
     <ul class="menu-inner py-1">
         <!-- Dashboard -->
+        <li class="menu-item">
+            <a href="{{ route('dashboard.layout') }}" class="menu-link">
+                <i class="bx bx-home" style= "margin-right: 12px;"></i>
+                <div data-i18n="Account Settings">Trang chủ</div>
+            </a>
+        </li>
 
         <li class="menu-item">
             <a href="{{ route('users.index') }}" class="menu-link">

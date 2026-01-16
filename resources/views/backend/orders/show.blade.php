@@ -48,10 +48,10 @@
                                 </td>
                                 <td>{{ $item->product->name ?? ($item->product_name ?? '-') }}</td>
                                 <td>{{ $item->quantity ?? 1 }}</td>
-                                <td>{{ number_format($item->price ?? ($item->product->price ?? 0), 0, ',', '.') }} VNĐ
+                                <td>{{ number_format($item->price ?? ($item->product->price ?? 0), 0, ',', '.') }} $
                                 </td>
                                 <td>{{ number_format(($item->price ?? ($item->product->price ?? 0)) * ($item->quantity ?? 1), 0, ',', '.') }}
-                                    VNĐ</td>
+                                    $</td>
                             </tr>
                         @endforeach
                     @else
